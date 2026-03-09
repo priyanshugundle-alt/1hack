@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Orders - SafetyFirst AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="layout">
+
+    <div class="sidebar">
+      <h2 class="logo">🩺 SafetyFirst</h2>
+      <ul>
+        <li><a id="dashboardBtn" href="dashboard.html">Dashboard</a></li>
+        <li><a id="ordersBtn" href="orders.html">Orders</a></li>
+        <li><a id="nearbyBtn" href="nearby-store.html">Nearby Hosptial</a></li>
+        <li><a id="adminBtn" href="admin.html">Admin</a></li>
+      </ul>
+    </div>
+
+    <div class="main">
+      <div class="orders-container">
+        <div class="orders-card">
+          <h2>My Orders</h2>
+          <div id="ordersList" class="orders-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/orders.js"></script>
+</body>
+
+</html>
+
+<script>
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  if (!user) {
+    window.location.href = "login.html";
+  }
+
+  if (user.role === "admin") {
+    // Hide user pages
+    document.getElementById("dashboardBtn").style.display = "none";
+    document.getElementById("ordersBtn").style.display = "none";
+    document.getElementById("nearbyBtn").style.display = "none";
+  } else {
+    // Hide admin page
+    document.getElementById("adminBtn").style.display = "none";
+  }
+</script>
+
+<button onclick="logout()">Logout</button>
+
+<script>
+  function logout() {
+    localStorage.removeItem("user");
+    window.location.href = "login.html";
+  }
+</script>

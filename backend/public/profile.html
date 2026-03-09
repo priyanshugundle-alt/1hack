@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Profile — SafetyFirst AI</title>
+  <meta name="description" content="Manage your healthcare profile, medical details, and personal information.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== RESET & BASE ===== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #080e1a;
+      --surface: rgba(255, 255, 255, 0.045);
+      --surface-h: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.08);
+      --accent: #00d4ff;
+      --accent2: #7c3aed;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --sidebar-w: 240px;
+      --radius: 16px;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%, rgba(0, 212, 255, 0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 90%, rgba(124, 58, 237, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== LAYOUT ===== */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: rgba(8, 14, 26, 0.9);
+      backdrop-filter: blur(24px);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 16px;
+      position: sticky;
+      top: 0;
+      transition: width 0.3s ease;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .sidebar.collapsed {
+      width: 72px;
+    }
+
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .logo-text,
+    .sidebar.collapsed .sidebar-footer {
+      display: none;
+    }
+
+    .sidebar.collapsed .nav-item {
+      justify-content: center;
+      padding: 14px;
+    }
+
+    .sidebar.collapsed .nav-section-label {
+      display: none;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      font-size: 16px;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+
+    .collapse-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .collapse-btn:hover {
+      color: var(--text);
+      background: var(--surface-h);
+    }
+
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 0 12px;
+      margin: 16px 0 8px;
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .nav-item:hover {
+      color: var(--text);
+      background: var(--surface-h);
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid rgba(0, 212, 255, 0.15);
+    }
+
+    .nav-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      width: 20px;
+      text-align: center;
+    }
+
+    .nav-label {
+      white-space: nowrap;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .logout-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 12px;
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    /* ===== MAIN ===== */
+    .main {
+      flex: 1;
+      padding: 32px 36px;
+      overflow-y: auto;
+      min-width: 0;
+    }
+
+    /* ===== TOPBAR ===== */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+
+    .topbar h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .topbar-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ===== PROFILE HERO ===== */
+    .profile-hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.5s ease;
+    }
+
+    .profile-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.04) 0%, rgba(124, 58, 237, 0.04) 100%);
+      pointer-events: none;
+    }
+
+    .avatar-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .avatar {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      border: 3px solid rgba(0, 212, 255, 0.3);
+      box-shadow: 0 0 24px rgba(0, 212, 255, 0.2);
+    }
+
+    .avatar-ring {
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 2px dashed rgba(0, 212, 255, 0.2);
+      animation: spin-slow 12s linear infinite;
+    }
+
+    @keyframes spin-slow {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .hero-info {
+      flex: 1;
+    }
+
+    .hero-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .hero-email {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .hero-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid;
+    }
+
+    .badge.green {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: var(--green);
+    }
+
+    .badge.blue {
+      background: rgba(0, 212, 255, 0.1);
+      border-color: rgba(0, 212, 255, 0.3);
+      color: var(--accent);
+    }
+
+    .badge.amber {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: var(--amber);
+    }
+
+    /* ===== STAT MINI CARDS ===== */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .stat-icon.blue {
+      background: rgba(0, 212, 255, 0.12);
+    }
+
+    .stat-icon.purple {
+      background: rgba(124, 58, 237, 0.12);
+    }
+
+    .stat-icon.green {
+      background: rgba(16, 185, 129, 0.12);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ===== FORM SECTIONS ===== */
+    .sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .sections-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      animation: fadeUp 0.7s ease;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(0, 212, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* ===== FORM FIELDS ===== */
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      background: var(--surface-h);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .field input::placeholder,
+    .field textarea::placeholder {
+      color: var(--muted);
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: rgba(0, 212, 255, 0.4);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .field input:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .field select option {
+      background: #0f1822;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ===== BMI BAR ===== */
+    .bmi-bar-wrap {
+      margin-top: 10px;
+      height: 6px;
+      border-radius: 4px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .bmi-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--green), var(--amber), var(--red));
+      transition: width 0.6s ease;
+    }
+
+    /* ===== SAVE BUTTON ===== */
+    .save-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn-secondary {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-h);
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-secondary:hover {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .btn-primary {
+      padding: 10px 28px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #0072ff);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.88;
+      box-shadow: 0 4px 18px rgba(0, 114, 255, 0.4);
+    }
+
+    .btn-primary.saving {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: #0f1822;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--text);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+      max-width: 320px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .toast.success {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .toast.error {
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .toast-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .toast-msg {
+      flex: 1;
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a class="logo" href="dashboard.html">
+          <div class="logo-icon">🩺</div>
+          <span class="logo-text">SafetyFirst</span>
+        </a>
+        <button class="collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">☰</button>
+      </div>
+
+      <span class="nav-section-label">Main</span>
+      <nav>
+        <ul>
+          <li>
+            <a id="dashboardBtn" class="nav-item" href="dashboard.html">
+              <span class="nav-icon">🏠</span>
+              <span class="nav-label">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a id="nearbyBtn" class="nav-item" href="nearby-store.html">
+              <span class="nav-icon">🏥</span>
+              <span class="nav-label">Nearby Hospital</span>
+            </a>
+          </li>
+          <li>
+            <a class="nav-item active" href="profile.html">
+              <span class="nav-icon">👤</span>
+              <span class="nav-label">Profile</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()">
+          <span>🚪</span>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main">
+
+      <!-- Topbar -->
+      <div class="topbar">
+        <div>
+          <h1>My Profile</h1>
+          <div class="topbar-sub">Manage your personal & medical information</div>
+        </div>
+      </div>
+
+      <!-- Hero -->
+      <div class="profile-hero">
+        <div class="avatar-wrap">
+          <div class="avatar-ring"></div>
+          <div class="avatar" id="avatarEmoji">👤</div>
+        </div>
+        <div class="hero-info">
+          <div class="hero-name" id="heroName">—</div>
+          <div class="hero-email" id="heroEmail">—</div>
+          <div class="hero-badges">
+            <span class="badge green">✔ Verified Patient</span>
+            <span class="badge blue" id="roleTag">User</span>
+            <span class="badge amber" id="memberSince">Member</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-icon blue">📏</div>
+          <div>
+            <div class="stat-label">Height</div>
+            <div class="stat-value" id="statHeight">—</div>
+            <div class="stat-sub">centimetres</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">⚖️</div>
+          <div>
+            <div class="stat-label">Weight</div>
+            <div class="stat-value" id="statWeight">—</div>
+            <div class="stat-sub">kilograms</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">🏃</div>
+          <div>
+            <div class="stat-label">BMI</div>
+            <div class="stat-value" id="statBmi">—</div>
+            <div class="stat-sub" id="bmiLabel">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Sections -->
+      <div class="sections-grid">
+
+        <!-- Personal Info -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="section-icon">🙍</div>
+            <span class="section-title">Personal Information</span>
+          </div>
+
+          <div class="field">
+            <label>Full Name</label>
+            <input id="name" type="text" placeholder="Your name" disabled />
+          </div>
+          <div class="field">
+            <label>Email Address</label>
+            <input id="email" type="text" placeholder="you@example.com" disabled />
+          </div>
+          <div class="field">
+            <label>Date of Birth</label>
+            <input id="dob" type="date" onchange="computeStats()" />
+          </div>
+          <div class="field">
+            <label>Home Address</label>
+            <input id="address" type="text" placeholder="123 Main St, City" />
+          </div>
+        </div>
+
+        <!-- Medical Details -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="section-icon">💊</div>
+            <span class="section-title">Medical Details</span>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Height (cm)</label>
+              <input id="height" type="number" placeholder="e.g. 170" oninput="computeStats()" />
+            </div>
+            <div class="field">
+              <label>Weight (kg)</label>
+              <input id="weight" type="number" placeholder="e.g. 70" oninput="computeStats()" />
+            </div>
+          </div>
+
+          <!-- BMI visual bar -->
+          <div class="field">
+            <label>BMI Indicator</label>
+            <div id="bmiDisplay" style="font-size:13px;color:var(--muted);margin-bottom:6px;">Enter height & weight to
+              calculate</div>
+            <div class="bmi-bar-wrap">
+              <div class="bmi-bar" id="bmiBar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Known Allergies</label>
+            <input id="allergies" type="text" placeholder="e.g. Penicillin, Pollen, Latex" />
+          </div>
+
+          <div class="field">
+            <label>Blood Group</label>
+            <select id="bloodGroup">
+              <option value="">Select blood group</option>
+              <option>A+</option>
+              <option>A−</option>
+              <option>B+</option>
+              <option>B−</option>
+              <option>AB+</option>
+              <option>AB−</option>
+              <option>O+</option>
+              <option>O−</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Save Row -->
+      <div class="save-row">
+        <button class="btn-secondary" onclick="window.location.href='dashboard.html'">← Back to Dashboard</button>
+        <button class="btn-primary" id="saveBtn" onclick="saveProfile()">
+          <span id="saveBtnText">💾 Save Changes</span>
+        </button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <span class="toast-icon" id="toastIcon">✅</span>
+    <span class="toast-msg" id="toastMsg">Profile updated!</span>
+  </div>
+
+  <script>
+    // ── Auth guard ──
+    let user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user) window.location.href = 'login.html';
+
+    // ── Sidebar collapse ──
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+
+    // ── Logout ──
+    function logout() {
+      localStorage.removeItem('user');
+      window.location.href = 'login.html';
+    }
+
+    // ── Role-based nav ──
+    if (user && user.role === 'admin') {
+      ['dashboardBtn', 'nearbyBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+    }
+
+    // ── Populate Fields ──
+    function populate() {
+      document.getElementById('name').value = user.name || '';
+      document.getElementById('email').value = user.email || '';
+      document.getElementById('dob').value = user.dob || '';
+      document.getElementById('height').value = user.height || '';
+      document.getElementById('weight').value = user.weight || '';
+      document.getElementById('allergies').value = user.allergies || '';
+      document.getElementById('address').value = user.address || '';
+
+      if (user.bloodGroup) {
+        const sel = document.getElementById('bloodGroup');
+        [...sel.options].forEach(o => { if (o.value === user.bloodGroup) o.selected = true; });
+      }
+
+      // Hero section
+      document.getElementById('heroName').textContent = user.name || '—';
+      document.getElementById('heroEmail').textContent = user.email || '—';
+      document.getElementById('roleTag').textContent = (user.role || 'user').charAt(0).toUpperCase() + (user.role || 'user').slice(1);
+
+      // Avatar initial
+      const initials = (user.name || '?').trim()[0].toUpperCase();
+      document.getElementById('avatarEmoji').textContent = initials;
+
+      // Member since
+      const joined = user.createdAt ? new Date(user.createdAt).getFullYear() : new Date().getFullYear();
+      document.getElementById('memberSince').textContent = `Since ${joined}`;
+
+      computeStats();
+    }
+
+    // ── Compute BMI & Stats ──
+    function computeStats() {
+      const h = parseFloat(document.getElementById('height').value);
+      const w = parseFloat(document.getElementById('weight').value);
+      const dob = document.getElementById('dob').value;
+
+      // Stat cards
+      document.getElementById('statHeight').textContent = h || '—';
+      document.getElementById('statWeight').textContent = w || '—';
+
+      if (h > 0 && w > 0) {
+        const hM = h / 100;
+        const bmi = (w / (hM * hM)).toFixed(1);
+        let label = '', barPct = 0;
+
+        if (bmi < 18.5) { label = 'Underweight'; barPct = 20; }
+        else if (bmi < 25) { label = 'Normal ✅'; barPct = 45; }
+        else if (bmi < 30) { label = 'Overweight ⚠️'; barPct = 70; }
+        else { label = 'Obese 🔴'; barPct = 92; }
+
+        document.getElementById('statBmi').textContent = bmi;
+        document.getElementById('bmiLabel').textContent = label.replace(/\s?(✅|⚠️|🔴)/, '');
+        document.getElementById('bmiDisplay').textContent = `BMI: ${bmi} — ${label}`;
+        document.getElementById('bmiDisplay').style.color = bmi < 25 ? 'var(--green)' : bmi < 30 ? 'var(--amber)' : 'var(--red)';
+        document.getElementById('bmiBar').style.width = barPct + '%';
+        document.getElementById('statBmi').style.color = bmi < 25 ? 'var(--green)' : bmi < 30 ? 'var(--amber)' : 'var(--red)';
+      } else {
+        document.getElementById('statBmi').textContent = '—';
+        document.getElementById('bmiLabel').textContent = '—';
+        document.getElementById('bmiDisplay').textContent = 'Enter height & weight to calculate';
+        document.getElementById('bmiDisplay').style.color = 'var(--muted)';
+        document.getElementById('bmiBar').style.width = '0%';
+        document.getElementById('statBmi').style.color = 'var(--text)';
+      }
+    }
+
+    // ── Toast ──
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      document.getElementById('toastIcon').textContent = type === 'success' ? '✅' : '❌';
+      toast.className = `toast ${type} show`;
+      setTimeout(() => { toast.className = `toast ${type}`; }, 3500);
+    }
+
+    // ── Save Profile ──
+    async function saveProfile() {
+      const btn = document.getElementById('saveBtn');
+      const txt = document.getElementById('saveBtnText');
+      btn.classList.add('saving');
+      txt.textContent = '⏳ Saving…';
+
+      const payload = {
+        id: user.id,
+        dob: document.getElementById('dob').value,
+        height: document.getElementById('height').value,
+        weight: document.getElementById('weight').value,
+        allergies: document.getElementById('allergies').value,
+        address: document.getElementById('address').value,
+        bloodGroup: document.getElementById('bloodGroup').value,
+      };
+
+      try {
+        const res = await fetch('/update-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          user = { ...user, ...payload };
+          localStorage.setItem('user', JSON.stringify(data.user ?? user));
+          showToast('Profile updated successfully!', 'success');
+          computeStats();
+        } else {
+          showToast(data.message || 'Error updating profile', 'error');
+        }
+      } catch (err) {
+        showToast('Could not connect to server', 'error');
+      } finally {
+        btn.classList.remove('saving');
+        txt.textContent = '💾 Save Changes';
+      }
+    }
+
+    // ── Init ──
+    populate();
+  </script>
+</body>
+
+</html>

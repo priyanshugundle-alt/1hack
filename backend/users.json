@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1772340181947,
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "$2b$10$zwYJUV5HosavredQULzzJumvycKCT6FHebzB2mWzMu3XBMfszIksC",
+    "role": "user",
+    "dob": "",
+    "height": "180",
+    "weight": "75",
+    "allergies": "Peanuts",
+    "address": "123 Test St, Test City"
+  },
+  {
+    "id": 1772340444900,
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "password": "$2b$10$QzIx6NDtHLHOoDUod2GMj.hv4aAwifP8enS4VAxWSMO/kVGIt8VTG",
+    "role": "admin",
+    "dob": "",
+    "height": "",
+    "weight": "",
+    "allergies": "",
+    "address": ""
+  }
+]
