@@ -18,10 +18,10 @@ The heart of our system is a continuous **Multi-Agent Orchestration** flow power
 *   **Inventory Agent**: Intelligently maps natural conversational language (e.g., "1 strip of paracetamol") to exact SKUs, verifies stock availability, enforces prescription requirements, and calculates pricing.
 *   **Action Agent**: Formulates clear, professional final responses that summarize backend execution results (e.g., order success, stock shortages, prescription warnings) back to the user natively.
 
-### 📸 Groq Vision OCR (Prescription Scanning)
-*   **Precision Scanning**: Direct integration with **Groq's Llama 4 Scout 17B** vision model for Optical Character Recognition (OCR) — no Gemini key required.
+### 📸 Tesseract OCR (Prescription Scanning)
+*   **Precision Scanning**: Direct integration with **Tesseract.js** for reliable, totally free Optical Character Recognition (OCR) — no Vision API costs or limits.
 *   **Auto-Structuralization**: Extracts doctor details, medicine names, dosages, and quantities from handwritten or printed prescription images.
-*   **Instant Sync**: Scanned data is structured via LLM and saved directly to the patient's digital health record for future order verification.
+*   **Instant Sync**: Scanned text is structured via Groq LLM and saved directly to the patient's digital health record for future order verification.
 
 ### 🔔 Proactive Care & Subscriptions
 *   **Automated Refills**: For chronic conditions, patients can enable "Subscribed" mode for hands-off recurring delivery.
@@ -53,7 +53,7 @@ The heart of our system is a continuous **Multi-Agent Orchestration** flow power
 | **Frontend** | Vanilla JS, HTML5, CSS3 |
 | **Backend** | Node.js, Express.js |
 | **AI (Chat + Agents)** | Groq — Llama 3.3 70B Versatile |
-| **AI (Vision OCR)** | Groq — Llama 4 Scout 17B Instruct |
+| **AI (Vision OCR)** | Tesseract.js (Local Machine Learning) |
 | **Observability** | Langfuse (Agent Tracing & LLM Logging) |
 | **Database** | XLSX (Inventory), JSON (Users / Orders / Chat History / Prescriptions) |
 | **Auth** | bcrypt (password hashing) |
