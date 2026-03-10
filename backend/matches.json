@@ -1,0 +1,50 @@
+[
+  {
+    "line": 233,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  },
+  {
+    "line": 301,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  },
+  {
+    "line": 342,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  },
+  {
+    "line": 451,
+    "text": "// Use Groq's vision model via the already-configured openai client"
+  },
+  {
+    "line": 456,
+    "text": "const visionRes = await openai.chat.completions.create({"
+  },
+  {
+    "line": 457,
+    "text": "model: \"llama-3.2-90b-vision-instruct\","
+  },
+  {
+    "line": 479,
+    "text": "const text = visionRes.choices[0].message.content || \"\";"
+  },
+  {
+    "line": 486,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  },
+  {
+    "line": 600,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  },
+  {
+    "line": 699,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  },
+  {
+    "line": 853,
+    "text": ": \"No valid medicines found.\";"
+  },
+  {
+    "line": 858,
+    "text": "model: \"llama-3.3-70b-versatile\","
+  }
+]
