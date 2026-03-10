@@ -1,33 +1,6 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const mongoose = require("mongoose");
-
-// =============================
-// MONGODB CONNECTION
-// =============================
-const MONGO_URI = process.env.MONGO_URI;
-
-if (MONGO_URI) {
-  mongoose.connect(MONGO_URI)
-    .then(() => console.log("🍃 MongoDB Connected!"))
-    .catch(err => console.error("❌ MongoDB Connection Error:", err));
-} else {
-  console.warn("⚠️ MONGO_URI missing, the app is running in local file storage mode.");
-}
-
-const { OpenAI } = require("openai");
-
-console.log("🔑 ENV KEY loaded?", process.env.GROQ_API_KEY ? "✅ YES" : "❌ NO");
-console.log("🤖 Groq key loaded:", !!process.env.GROQ_API_KEY);
-const fetch = require("node-fetch");
-function wordToNumber(word) {
-  const map = {
-    one: 1, two: 2, three: 3, four: 4, five: 5,
-    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    fifteen: 15, twenty: 20, thirty: 30
-  };
-  return map[word.toLowerCase()] || null;
-}
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -36,6 +9,132 @@ const xlsx = require("xlsx");
 const { Langfuse } = require("langfuse");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
+const { OpenAI } = require("openai");
+const fetch = require("node-fetch");
+
+// =============================
+// MONGODB CONNECTION
+// =============================
+const MONGO_URI = process.env.MONGO_URI;
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// =============================
+// GLOBAL DATA STORAGE
+// =============================
+let users = [];
+let orders = [];
+let prescriptions = [];
+let chatHistory = [];
+const chatHistoryPath = path.join(__dirname, "chatHistory.json");
+const orderFile = path.join(__dirname, "orders.json");
+const prescriptionsFile = path.join(__dirname, "prescriptions.json");
+
+if (MONGO_URI) {
+  mongoose.connect(MONGO_URI)
+    .then(() => {
+      console.log("🍃 MongoDB Connected!");
+      // Initialize data from MongoDB
+      syncDataFromDB();
+    })
+    .catch(err => console.error("❌ MongoDB Connection Error:", err));
+} else {
+  console.warn("⚠️ MONGO_URI missing, the app is running in local file storage mode.");
+}
+
+// =============================
+// MONGODB SCHEMAS
+// =============================
+const UserSchema = new mongoose.Schema({
+  id: { type: String, unique: true },
+  name: String,
+  email: { type: String, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, default: 'user' },
+  dob: String,
+  height: String,
+  weight: String,
+  allergies: String,
+  address: String,
+  language: { type: String, default: 'en' }
+});
+
+const OrderSchema = new mongoose.Schema({
+  id: String,
+  userId: String,
+  name: String,
+  medicine: String,
+  quantity: Number,
+  dailyUsage: Number,
+  orderDate: { type: Date, default: Date.now },
+  refillDate: Date,
+  status: { type: String, default: 'Pending' },
+  subscription: { type: Boolean, default: false }
+});
+
+const PrescriptionSchema = new mongoose.Schema({
+  id: String,
+  patientId: String,
+  doctorName: String,
+  medicine: String,
+  quantity: Number,
+  dailyUsage: Number,
+  notes: String,
+  date: { type: Date, default: Date.now }
+});
+
+const ChatHistorySchema = new mongoose.Schema({
+  userId: String,
+  role: String,
+  message: String,
+  time: { type: Date, default: Date.now }
+});
+
+const UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
+const OrderModel = mongoose.models.Order || mongoose.model("Order", OrderSchema);
+const PrescriptionModel = mongoose.models.Prescription || mongoose.model("Prescription", PrescriptionSchema);
+const ChatHistoryModel = mongoose.models.ChatHistory || mongoose.model("ChatHistory", ChatHistorySchema);
+
+// Sync in-memory arrays with DB
+async function syncDataFromDB() {
+  try {
+    const dbUsers = await UserModel.find({});
+    const dbOrders = await OrderModel.find({});
+    const dbPrescriptions = await PrescriptionModel.find({});
+
+    if (dbUsers.length > 0) users = dbUsers;
+    if (dbOrders.length > 0) orders = dbOrders;
+    if (dbPrescriptions.length > 0) prescriptions = dbPrescriptions;
+
+    console.log(`📊 Synced: ${dbUsers.length} users, ${dbOrders.length} orders, ${dbPrescriptions.length} prescriptions from Cloud.`);
+
+    // Initial migration from local files if DB is empty
+    if (dbUsers.length === 0 && fs.existsSync('./users.json')) {
+      const localUsers = JSON.parse(fs.readFileSync('./users.json'));
+      if (localUsers.length > 0) {
+        await UserModel.insertMany(localUsers);
+        console.log("📤 Migrated users to Cloud.");
+      }
+    }
+    if (dbOrders.length === 0 && fs.existsSync('./orders.json')) {
+      const localOrders = JSON.parse(fs.readFileSync('./orders.json'));
+      if (localOrders.length > 0) {
+        await OrderModel.insertMany(localOrders);
+        console.log("📤 Migrated orders to Cloud.");
+      }
+    }
+    if (dbPrescriptions.length === 0 && fs.existsSync('./prescriptions.json')) {
+      const localPres = JSON.parse(fs.readFileSync('./prescriptions.json'));
+      if (localPres.length > 0) {
+        await PrescriptionModel.insertMany(localPres);
+        console.log("📤 Migrated prescriptions to Cloud.");
+      }
+    }
+  } catch (err) {
+    console.error("❌ Sync Error:", err);
+  }
+}
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -109,8 +208,6 @@ HANDWRITING RECOVERY MODE: If the input text looks like messy OCR (misspellings,
   return text.trim();
 }
 
-const app = express();
-const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
@@ -217,15 +314,12 @@ app.post("/chat", async (req, res) => {
         } catch (e) { }
       }
 
-      // Save history for agent responses so multi-turn flows (qty/dose prompts) work
+      // Save history for agent responses (Cloud)
       try {
-        let globalHistory = [];
-        if (fs.existsSync(chatHistoryPath)) {
-          globalHistory = JSON.parse(fs.readFileSync(chatHistoryPath));
-        }
-        globalHistory.push({ userId, role: "user", message, time: new Date() });
-        globalHistory.push({ userId, role: "bot", message: agentData.reply, time: new Date() });
-        fs.writeFileSync(chatHistoryPath, JSON.stringify(globalHistory, null, 2));
+        const userMsg = new ChatHistoryModel({ userId, role: "user", message, time: new Date() });
+        const botMsg = new ChatHistoryModel({ userId, role: "bot", message: agentData.reply, time: new Date() });
+        await userMsg.save();
+        await botMsg.save();
       } catch (e) { console.error("History Save Error:", e); }
 
       return res.json(agentData);
@@ -249,23 +343,7 @@ app.post("/chat", async (req, res) => {
 
 
 
-// File paths
-const chatHistoryPath = path.join(__dirname, "chatHistory.json");
-const orderFile = path.join(__dirname, "orders.json");
-// Load existing data
-let orders = [];
-let chatHistory = [];
-try {
-  chatHistory = JSON.parse(fs.readFileSync(chatHistoryPath));
-} catch {
-  chatHistory = [];
-}
-
-try {
-  orders = JSON.parse(fs.readFileSync(orderFile));
-} catch {
-  orders = [];
-}
+// Data initialization moved to top
 /* =====================================================
    Chat History
  ===================================================== */
@@ -312,25 +390,23 @@ console.log("✅ Inventory Loaded:", inventory.length);
    🧠 AGENT TRACE STORAGE & PRESCRIPTIONS
  ===================================================== */
 let agentLogs = [];
-let prescriptions = [];
-const prescriptionsFile = "./prescriptions.json";
-
-try {
-  prescriptions = JSON.parse(fs.readFileSync(prescriptionsFile));
-} catch (e) {
-  prescriptions = [];
-}
+// prescriptions moved to top
 
 app.get("/prescriptions/:userId", (req, res) => {
   const userRx = prescriptions.filter(p => String(p.patientId) === String(req.params.userId));
   res.json(userRx);
 });
 
-app.delete("/prescriptions/:id", (req, res) => {
+app.delete("/prescriptions/:id", async (req, res) => {
   const id = req.params.id;
-  prescriptions = prescriptions.filter(p => String(p.id) !== String(id));
-  fs.writeFileSync(prescriptionsFile, JSON.stringify(prescriptions, null, 2));
-  res.json({ success: true });
+  try {
+    await PrescriptionModel.deleteOne({ id: String(id) });
+    prescriptions = prescriptions.filter(p => String(p.id) !== String(id));
+    fs.writeFileSync(prescriptionsFile, JSON.stringify(prescriptions, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
 });
 
 /* =====================================================
@@ -391,9 +467,9 @@ app.post("/scan-prescription", upload.single("prescription"), async (req, res) =
         });
         const extracted = JSON.parse(structuralRes.choices[0].message.content).prescriptions || [];
 
-        extracted.forEach(rx => {
-          prescriptions.push({
-            id: Date.now() + Math.floor(Math.random() * 999),
+        for (const rx of extracted) {
+          const newRx = new PrescriptionModel({
+            id: (Date.now() + Math.floor(Math.random() * 999)).toString(),
             patientId: userId,
             doctorName: rx.doctorName || "Unknown Doctor",
             medicine: rx.medicine,
@@ -402,7 +478,9 @@ app.post("/scan-prescription", upload.single("prescription"), async (req, res) =
             notes: rx.notes || "Auto-extracted from scan",
             date: new Date()
           });
-        });
+          await newRx.save();
+          prescriptions.push(newRx.toObject());
+        }
         fs.writeFileSync(prescriptionsFile, JSON.stringify(prescriptions, null, 2));
       } catch (e) {
         console.error("Prescription Structural Parse Error:", e);
@@ -434,14 +512,11 @@ app.post("/agent-order", async (req, res) => {
     const { message, chatHistory: incomingHistory } = req.body;
     const userId = String(req.body.userId || "anonymous");
 
-    // ✨ LOAD CHAT FROM FILE OR PAYLOAD
+    // ✨ LOAD CHAT FROM DB OR PAYLOAD
     let chatHistory = incomingHistory;
     if (!chatHistory) {
-      if (fs.existsSync(chatHistoryPath)) {
-        chatHistory = JSON.parse(fs.readFileSync(chatHistoryPath)).filter(m => String(m.userId) === userId).slice(-5);
-      } else {
-        chatHistory = [];
-      }
+      chatHistory = await ChatHistoryModel.find({ userId }).sort({ time: 1 }).limit(5);
+      chatHistory = chatHistory.map(h => h.toObject());
     }
     const historyString = chatHistory.map(m => `${m.role.toUpperCase()}: ${m.message}`).join("\n");
     // 🚀 CONSOLIDATED ORCHESTRATOR AGENT
@@ -701,8 +776,8 @@ JSON SCHEMA:
       const user = users.find(u => String(u.id) === String(userId));
       const userName = user ? user.name : "Unknown User";
 
-      orders.push({
-        id: Date.now() + Math.floor(Math.random() * 9999),
+      const newOrder = new OrderModel({
+        id: (Date.now() + Math.floor(Math.random() * 9999)).toString(),
         userId,
         name: userName,
         medicine: medicine["product name"],
@@ -713,6 +788,8 @@ JSON SCHEMA:
         status: "Pending",
         subscription: isSubscription
       });
+      await newOrder.save();
+      orders.push(newOrder.toObject());
 
       results.push(`🎉 SUCCESS: Created order for ${it.qty} units of ${medicine["product name"]}.`);
 
@@ -726,8 +803,8 @@ JSON SCHEMA:
       });
     }
 
-    // Save order history (JSON)
-    fs.writeFileSync(orderFile, JSON.stringify(orders, null, 2));
+    // Save order history (JSON) backup
+    fs.writeFileSync("./orders.json", JSON.stringify(orders, null, 2));
 
     // 📦 UPDATE SPREADSHEET TO PERSIST THE MINUS OPERATION
     const newInventorySheet = xlsx.utils.json_to_sheet(inventory);
@@ -792,14 +869,7 @@ JSON SCHEMA:
 // =============================
 // LOAD USERS
 // =============================
-let users = [];
-
-try {
-  users = JSON.parse(fs.readFileSync("./users.json"));
-} catch (err) {
-  console.log("users.json empty or corrupted. Resetting.");
-  users = [];
-}
+// users moved to top
 // =============================
 // LOAD INVENTORY
 // =============================
@@ -898,85 +968,90 @@ app.post("/restock", (req, res) => {
 // ROUTE SIGNUP
 // =============================
 app.post("/signup", async (req, res) => {
-  const {
-    name,
-    email,
-    password,
-    role,
-    dob,
-    height,
-    weight,
-    allergies,
-    address
-  } = req.body;
+  const { name, email, password, role, dob, height, weight, allergies, address } = req.body;
   if (!name || !email || !password) {
     return res.json({ success: false, message: "Required fields missing" });
   }
-  const existingUser = users.find(u => u.email === email);
-  if (existingUser) {
-    return res.json({ success: false, message: "Email already exists" });
+  try {
+    const existingUser = await UserModel.findOne({ email });
+    if (existingUser) {
+      return res.json({ success: false, message: "Email already exists" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = Date.now().toString();
+    const newUser = new UserModel({
+      id: userId,
+      name,
+      email,
+      password: hashedPassword,
+      role: role || "user",
+      dob: dob || "",
+      height: height || "",
+      weight: weight || "",
+      allergies: allergies || "",
+      address: address || ""
+    });
+    await newUser.save();
+    // Update local array
+    const userObj = newUser.toObject();
+    users.push(userObj);
+    fs.writeFileSync("./users.json", JSON.stringify(users, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Signup Error:", err);
+    res.status(500).json({ success: false, message: "Error during signup" });
   }
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = {
-    id: Date.now(),
-    name,
-    email,
-    password: hashedPassword,
-    role: role || "user",
-    dob: dob || "",
-    height: height || "",
-    weight: weight || "",
-    allergies: allergies || "",
-    address: address || ""
-  };
-  users.push(newUser);
-  fs.writeFileSync("./users.json", JSON.stringify(users, null, 2));
-  res.json({ success: true });
 });
-// =============================
-// ROUTE UPDATE PROFILE
-// =============================
-app.post("/update-profile", (req, res) => {
+
+app.post("/update-profile", async (req, res) => {
   const { id, dob, height, weight, allergies, address } = req.body;
-  const user = users.find(u => u.id == id);
-  if (!user) {
-    return res.json({ success: false });
+  try {
+    const user = await UserModel.findOneAndUpdate(
+      { id: String(id) },
+      { dob, height, weight, allergies, address },
+      { new: true }
+    );
+    if (!user) return res.json({ success: false });
+
+    // Update local cache
+    const idx = users.findIndex(u => String(u.id) === String(id));
+    if (idx !== -1) users[idx] = user.toObject();
+    fs.writeFileSync("./users.json", JSON.stringify(users, null, 2));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false });
   }
-  user.dob = dob;
-  user.height = height;
-  user.weight = weight;
-  user.allergies = allergies;
-  user.address = address;
-  fs.writeFileSync("./users.json", JSON.stringify(users, null, 2));
-  res.json({ success: true });
 });
-// =============================
-// ROUTE LOGIN
-// =============================
+
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const user = users.find(u => u.email === email);
-  if (!user) {
-    return res.json({ success: false, message: "User not found" });
-  }
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return res.json({ success: false, message: "Wrong password" });
-  }
-  res.json({
-    success: true,
-    user: {
-      role: user.role,
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      height: user.height,
-      weight: user.weight,
-      dob: user.dob,
-      allergies: user.allergies,
-      address: user.address
+  try {
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
     }
-  });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.json({ success: false, message: "Wrong password" });
+    }
+    res.json({
+      success: true,
+      user: {
+        role: user.role,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        height: user.height,
+        weight: user.weight,
+        dob: user.dob,
+        allergies: user.allergies,
+        address: user.address
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Login error" });
+  }
 });
 
 
@@ -1045,19 +1120,19 @@ app.post("/ai-chat", async (req, res) => {
     const user = users.find(u => String(u.id) === String(userId)) || { id: userId, language: lang };
     if (!user.language) user.language = lang; // Ensure lang is passed to Groq context
 
-    // Load Chat History
-    let chatHistory = [];
-    if (fs.existsSync(chatHistoryPath)) {
-      chatHistory = JSON.parse(fs.readFileSync(chatHistoryPath));
-    }
+    // Load Chat History (from Cloud)
+    let chatHistory = await ChatHistoryModel.find({ userId }).sort({ time: 1 }).limit(10);
+    chatHistory = chatHistory.map(h => h.toObject());
 
-    // Add User Message
-    chatHistory.push({
+    // Add User Message (Push to Cloud)
+    const userMsg = new ChatHistoryModel({
       userId,
       role: "user",
       message,
       time: new Date()
     });
+    await userMsg.save();
+    chatHistory.push(userMsg.toObject());
 
     // Provide a small slice of inventory to help the AI know what's in stock
     let inventoryPreview = (inventory || [])
@@ -1076,16 +1151,14 @@ app.post("/ai-chat", async (req, res) => {
 
     const reply = await callGroq({ user, message, inventoryPreview, chatHistory });
 
-    // Add Bot Message
-    chatHistory.push({
+    // Add Bot Message (Push to Cloud)
+    const botMsg = new ChatHistoryModel({
       userId,
       role: "bot",
       message: reply,
       time: new Date()
     });
-
-    // Save Chat History
-    fs.writeFileSync(chatHistoryPath, JSON.stringify(chatHistory, null, 2));
+    await botMsg.save();
 
     res.json({ reply });
 
@@ -1138,7 +1211,8 @@ app.put("/api/orders/:id", (req, res) => {
   const oldStatus = orders[orderIndex].status;
   orders[orderIndex].status = newStatus;
 
-  // Send email if status changes to Approved
+  // Update MongoDB
+  OrderModel.findOneAndUpdate({ id: orderId }, { status: newStatus }).exec().catch(e => console.error("DB Status Update Error", e));
   if (oldStatus !== "Approved" && newStatus === "Approved") {
     const order = orders[orderIndex];
     const user = users.find(u => String(u.id) === String(order.userId));
@@ -1167,25 +1241,25 @@ app.put("/api/orders/:id", (req, res) => {
 });
 
 // ✨ PROACTIVE AUTOMATION: Daily Subscription & Refill Reminders
-setInterval(() => {
+setInterval(async () => {
   const today = new Date();
 
   // Track meds already reminded today to avoid spam
   const remindedUsers = new Set();
 
-  orders.forEach(order => {
+  for (const order of orders) {
     const refillDate = new Date(order.refillDate);
     const userId = order.userId;
     const user = users.find(u => String(u.id) === String(userId));
-    if (!user || !user.email) return;
+    if (!user || !user.email) continue;
 
     // A) Auto-Refill for Subscriptions
     if (order.subscription && today >= refillDate) {
       const newRefillDate = new Date();
       newRefillDate.setDate(newRefillDate.getDate() + Math.ceil(order.quantity / order.dailyUsage));
 
-      orders.push({
-        id: Date.now() + Math.floor(Math.random() * 1000),
+      const newOrderData = {
+        id: (Date.now() + Math.floor(Math.random() * 1000)).toString(),
         userId: order.userId,
         name: user.name,
         medicine: order.medicine,
@@ -1195,7 +1269,14 @@ setInterval(() => {
         refillDate: newRefillDate,
         status: "Pending",
         subscription: true
-      });
+      };
+
+      const newOrder = new OrderModel(newOrderData);
+      await newOrder.save();
+      orders.push(newOrder.toObject());
+
+      // Update original order cycle in DB
+      await OrderModel.findOneAndUpdate({ id: order.id }, { refillDate: newRefillDate });
 
       order.refillDate = newRefillDate; // Update cycle
       sendEmail(user.email, "⏰ Automated Subscription Refill", `Good news! Your monthly refill for ${order.medicine} has been placed automatically.`);
@@ -1210,7 +1291,7 @@ setInterval(() => {
         remindedUsers.add(reminderKey); // Simple memory-based de-duplication for this run
       }
     }
-  });
+  }
 
   fs.writeFileSync(orderFile, JSON.stringify(orders, null, 2));
 }, 86400000); // runs every 24 hours

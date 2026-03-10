@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+inventory.xlsx
+chatHistory.json
+orders.json
+prescriptions.json
+users.json
+.vscode/
