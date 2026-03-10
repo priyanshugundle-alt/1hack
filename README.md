@@ -93,10 +93,19 @@ EMAIL_PASS=your_gmail_app_password
 
 
 ### 4. Run Locally
+To run the server locally on your machine, follow these steps:
+
+1. Open a terminal and navigate to the `backend` folder (if you aren't already there):
+```bash
+cd backend
+```
+
+2. Start the Node.js server:
 ```bash
 node server.js
 ```
-The app will be live at `http://localhost:5000`.
+
+3. Open your web browser and navigate to `http://localhost:5000` to interact with the application.
 
 ---
 
