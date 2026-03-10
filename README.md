@@ -88,6 +88,8 @@ EMAIL_PASS=your_gmail_app_password
 ```
 
 > 🔑 **Note**: You can get your **Groq API Key** [here](https://console.groq.com/keys) and your **Langfuse Keys** from your [Langfuse Project Settings](https://cloud.langfuse.com/).
+>
+> 👨‍⚖️ **For Judges (LLM Observability)**: We implemented Langfuse to trace our Multi-Agent AI workflows! The app handles missing keys gracefully and runs perfectly without them. However, if you would like to view the live execution tree and traces of the agent thought process, you can create a free Langfuse account, generate your own keys, and place them in the `.env` file!
 
 
 ### 4. Run Locally
