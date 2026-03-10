@@ -657,6 +657,10 @@ JSON SCHEMA:
     const { intent, isSubscription, daysMultiplier, items } = output;
     let finalItems = items || [];
 
+    if (finalItems.length === 0) {
+      return res.json({ reply: "" });
+    }
+
     // Apply days logic and force manual state injection if LLM forgot qty
     finalItems = finalItems.map(item => {
       const it = { ...item };
