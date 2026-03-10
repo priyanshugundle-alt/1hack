@@ -454,7 +454,7 @@ app.post("/scan-prescription", upload.single("prescription"), async (req, res) =
 
     console.log("📸 AI Vision: Processing prescription scan...");
     const visionRes = await openai.chat.completions.create({
-      model: "llama-3.2-11b-vision-instruct",
+      model: "llama-3.2-90b-vision-instruct",
       messages: [
         {
           role: "user",
