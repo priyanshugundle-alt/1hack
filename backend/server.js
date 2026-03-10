@@ -12,13 +12,13 @@ const multer = require("multer");
 const { OpenAI } = require("openai");
 const fetch = require("node-fetch");
 
+const app = express();
+const PORT = process.env.PORT || 5000;
+
 // =============================
 // MONGODB CONNECTION
 // =============================
 const MONGO_URI = process.env.MONGO_URI;
-
-const app = express();
-const PORT = process.env.PORT || 5000;
 
 // =============================
 // GLOBAL DATA STORAGE
@@ -27,9 +27,12 @@ let users = [];
 let orders = [];
 let prescriptions = [];
 let chatHistory = [];
+let inventory = []; // Moved here for persistence
 const chatHistoryPath = path.join(__dirname, "chatHistory.json");
 const orderFile = path.join(__dirname, "orders.json");
 const prescriptionsFile = path.join(__dirname, "prescriptions.json");
+const inventoryFile = path.join(__dirname, "inventory.xlsx");
+let inventoryWorkbook = fs.existsSync(inventoryFile) ? xlsx.readFile(inventoryFile) : null;
 
 if (MONGO_URI) {
   mongoose.connect(MONGO_URI)
@@ -91,10 +94,23 @@ const ChatHistorySchema = new mongoose.Schema({
   time: { type: Date, default: Date.now }
 });
 
+const InventorySchema = new mongoose.Schema({
+  "product id": { type: String, unique: true },
+  "product name": String,
+  pzn: String,
+  "price rec": Number,
+  "package size": String,
+  descriptions: String,
+  prescriptionRequired: String,
+  allergyTriggers: String,
+  Stock: Number
+});
+
 const UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
 const OrderModel = mongoose.models.Order || mongoose.model("Order", OrderSchema);
 const PrescriptionModel = mongoose.models.Prescription || mongoose.model("Prescription", PrescriptionSchema);
 const ChatHistoryModel = mongoose.models.ChatHistory || mongoose.model("ChatHistory", ChatHistorySchema);
+const InventoryModel = mongoose.models.Inventory || mongoose.model("Inventory", InventorySchema);
 
 // Sync in-memory arrays with DB
 async function syncDataFromDB() {
@@ -102,12 +118,17 @@ async function syncDataFromDB() {
     const dbUsers = await UserModel.find({});
     const dbOrders = await OrderModel.find({});
     const dbPrescriptions = await PrescriptionModel.find({});
+    const dbInventory = await InventoryModel.find({});
 
     if (dbUsers.length > 0) users = dbUsers;
     if (dbOrders.length > 0) orders = dbOrders;
     if (dbPrescriptions.length > 0) prescriptions = dbPrescriptions;
+    if (dbInventory.length > 0) {
+      inventory = dbInventory.map(i => i.toObject());
+      console.log(`📊 Synced: ${dbInventory.length} inventory items from Cloud.`);
+    }
 
-    console.log(`📊 Synced: ${dbUsers.length} users, ${dbOrders.length} orders, ${dbPrescriptions.length} prescriptions from Cloud.`);
+    console.log(`📊 Synced: ${dbUsers.length} users, ${dbOrders.length} orders, ${dbPrescriptions.length} prescriptions, ${dbInventory.length} inventory items from Cloud.`);
 
     // Initial migration from local files if DB is empty
     if (dbUsers.length === 0 && fs.existsSync('./users.json')) {
@@ -129,6 +150,18 @@ async function syncDataFromDB() {
       if (localPres.length > 0) {
         await PrescriptionModel.insertMany(localPres);
         console.log("📤 Migrated prescriptions to Cloud.");
+      }
+    }
+
+    // Initial migration for inventory from Excel if DB is empty
+    if (dbInventory.length === 0 && fs.existsSync(inventoryFile)) {
+      const workbook = xlsx.readFile(inventoryFile);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const localInventory = xlsx.utils.sheet_to_json(sheet).filter(item => item["product id"] && item["product name"]);
+      if (localInventory.length > 0) {
+        await InventoryModel.insertMany(localInventory);
+        inventory = localInventory;
+        console.log(`📤 Migrated ${localInventory.length} valid inventory items to Cloud.`);
       }
     }
   } catch (err) {
@@ -376,15 +409,7 @@ function calculateAge(dob) {
   }
   return age;
 }
-/* =====================================================
-   🚀 PHASE 2 — EXCEL AS SOURCE OF TRUTH
- ===================================================== */
-// Load Inventory Excel
-const inventoryWorkbook = xlsx.readFile("./inventory.xlsx");
-const inventorySheet =
-  inventoryWorkbook.Sheets[inventoryWorkbook.SheetNames[0]];
-const inventory = xlsx.utils.sheet_to_json(inventorySheet);
-console.log("✅ Inventory Loaded:", inventory.length);
+// Data initialization moved to top syncDataFromDB()
 
 /* =====================================================
    🧠 AGENT TRACE STORAGE & PRESCRIPTIONS
@@ -772,6 +797,11 @@ JSON SCHEMA:
       refillDate.setDate(today.getDate() + Math.max(0, daysCovered - 2));
 
       medicine[stockKey] -= it.qty;
+      // Update MongoDB for real-time persistence
+      await InventoryModel.findOneAndUpdate(
+        { "product id": medicine["product id"] },
+        { Stock: medicine[stockKey] }
+      );
 
       const user = users.find(u => String(u.id) === String(userId));
       const userName = user ? user.name : "Unknown User";
@@ -806,10 +836,16 @@ JSON SCHEMA:
     // Save order history (JSON) backup
     fs.writeFileSync("./orders.json", JSON.stringify(orders, null, 2));
 
-    // 📦 UPDATE SPREADSHEET TO PERSIST THE MINUS OPERATION
-    const newInventorySheet = xlsx.utils.json_to_sheet(inventory);
-    inventoryWorkbook.Sheets[inventoryWorkbook.SheetNames[0]] = newInventorySheet;
-    xlsx.writeFile(inventoryWorkbook, "./inventory.xlsx");
+    // 📦 Update Spreadsheet Backup
+    try {
+      if (inventoryWorkbook) {
+        const newInventorySheet = xlsx.utils.json_to_sheet(inventory);
+        inventoryWorkbook.Sheets[inventoryWorkbook.SheetNames[0]] = newInventorySheet;
+        xlsx.writeFile(inventoryWorkbook, inventoryFile);
+      }
+    } catch (e) {
+      console.error("Excel save error (non-critical):", e);
+    }
 
     const rawResults = results.length
       ? results.join("\n")
@@ -870,14 +906,7 @@ JSON SCHEMA:
 // LOAD USERS
 // =============================
 // users moved to top
-// =============================
-// LOAD INVENTORY
-// =============================
-const workbook = xlsx.readFile("./inventory.xlsx");
-const sheetName = workbook.SheetNames[0];
-const sheet = workbook.Sheets[sheetName];
-exports.sheet = sheet;
-console.log("📦 Loaded medicines:", inventory.length);
+// Inventory managed by syncDataFromDB()
 // ============================
 // GET FULL INVENTORY
 // =============================
@@ -894,7 +923,7 @@ app.get("/inventory", (req, res) => {
 // =============================
 // SEARCH MEDICINE
 // =============================
-app.get("/search", (req, res) => {
+app.get("/search", async (req, res) => {
   const query = req.query.name?.toLowerCase();
   if (!query) {
     return res.json({ found: false });
@@ -907,6 +936,11 @@ app.get("/search", (req, res) => {
     // Demo simulation
     if (result.Stock > 0) {
       result.Stock -= 1;
+      // Also update DB for consistency in demo
+      InventoryModel.findOneAndUpdate(
+        { "product id": result["product id"] },
+        { Stock: result.Stock }
+      ).exec().catch(e => console.error("Search stock update error", e));
     }
     const stock = result.Stock;
     let message;
@@ -948,16 +982,28 @@ app.get("/analytics", (req, res) => {
 // =============================
 // RESTOCK MEDICINE
 // =============================
-app.post("/restock", (req, res) => {
+app.post("/restock", async (req, res) => {
   const { id } = req.body;
   const medicine = inventory.find(item => item["product id"] == id);
   if (medicine) {
     medicine.Stock += 50; // add 50 units
 
-    // 📦 PERSIST THE RESTOCK TO EXCEL
-    const newInventorySheet = xlsx.utils.json_to_sheet(inventory);
-    inventoryWorkbook.Sheets[inventoryWorkbook.SheetNames[0]] = newInventorySheet;
-    xlsx.writeFile(inventoryWorkbook, "./inventory.xlsx");
+    // 📦 PERSIST TO DB
+    await InventoryModel.findOneAndUpdate(
+      { "product id": medicine["product id"] },
+      { Stock: medicine.Stock }
+    );
+
+    // 📦 PERSIST THE RESTOCK TO EXCEL BACKUP
+    try {
+      if (inventoryWorkbook) {
+        const newInventorySheet = xlsx.utils.json_to_sheet(inventory);
+        inventoryWorkbook.Sheets[inventoryWorkbook.SheetNames[0]] = newInventorySheet;
+        xlsx.writeFile(inventoryWorkbook, inventoryFile);
+      }
+    } catch (e) {
+      console.error("Excel save error (non-critical):", e);
+    }
 
     res.json({ success: true, newStock: medicine.Stock });
   } else {
