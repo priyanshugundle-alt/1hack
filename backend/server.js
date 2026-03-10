@@ -439,8 +439,10 @@ app.delete("/prescriptions/:id", async (req, res) => {
  ===================================================== */
 let lastAgentDecision = null;
 
+const Tesseract = require("tesseract.js");
+
 // =============================
-// GROQ VISION OCR PRESCRIPTION SCAN (replaces Gemini)
+// TESSERACT OCR PRESCRIPTION SCAN
 // =============================
 app.post("/scan-prescription", upload.single("prescription"), async (req, res) => {
   if (!req.file) {
@@ -448,35 +450,14 @@ app.post("/scan-prescription", upload.single("prescription"), async (req, res) =
   }
 
   try {
-    // Use Groq's vision model via the already-configured openai client
-    const base64Image = req.file.buffer.toString("base64");
-    const mimeType = req.file.mimetype;
-
-    console.log("📸 AI Vision: Processing prescription scan...");
-    const visionRes = await openai.chat.completions.create({
-      model: "llama-4-scout-17b-16e-instruct",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`
-              }
-            },
-            {
-              type: "text",
-              text: "Analyze this prescription carefully. Extract all medicines, daily dosages, and quantities explicitly in a professional, clear list format. Do not invent any non-existent data."
-            }
-          ]
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 1024
-    });
-
-    const text = visionRes.choices[0].message.content || "";
+    console.log("📸 Tesseract OCR: Processing prescription scan...");
+    
+    // Use Tesseract to run OCR locally for free
+    const { data: { text } } = await Tesseract.recognize(
+      req.file.buffer,
+      'eng',
+      { logger: m => console.log(m) }
+    );
 
     // 🧠 AUTO-SAVE TO USER PROFILE if userId is provided
     const userId = req.body.userId;
