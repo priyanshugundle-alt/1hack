@@ -452,8 +452,9 @@ app.post("/scan-prescription", upload.single("prescription"), async (req, res) =
     const base64Image = req.file.buffer.toString("base64");
     const mimeType = req.file.mimetype;
 
+    console.log("📸 AI Vision: Processing prescription scan...");
     const visionRes = await openai.chat.completions.create({
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      model: "llama-3.2-11b-vision-preview",
       messages: [
         {
           role: "user",
