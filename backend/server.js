@@ -243,14 +243,85 @@ HANDWRITING RECOVERY MODE: If the input text looks like messy OCR (misspellings,
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
 app.use(express.urlencoded({ extended: true }));
-// Langfuse setup
-const langfuse = new Langfuse({
-  publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-  secretKey: process.env.LANGFUSE_SECRET_KEY,
-  baseUrl: process.env.LANGFUSE_BASE_URL || "https://cloud.langfuse.com"
+
+// =============================
+// AUTH ROUTES (HIGH PRIORITY)
+// =============================
+
+// User Login
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
+    }
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.json({ success: false, message: "Wrong password" });
+    }
+    res.json({
+      success: true,
+      user: {
+        role: user.role,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        height: user.height,
+        weight: user.weight,
+        dob: user.dob,
+        allergies: user.allergies,
+        address: user.address
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Login error" });
+  }
 });
+
+// User Signup
+app.post("/signup", async (req, res) => {
+  const { name, email, password, role, dob, height, weight, allergies, address } = req.body;
+  if (!name || !email || !password) {
+    return res.json({ success: false, message: "Required fields missing" });
+  }
+  try {
+    const existingUser = await UserModel.findOne({ email });
+    if (existingUser) {
+      return res.json({ success: false, message: "Email already exists" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = Date.now().toString();
+    const newUser = new UserModel({
+      id: userId,
+      name,
+      email,
+      password: hashedPassword,
+      role: role || "user",
+      dob: dob || "",
+      height: height || "",
+      weight: weight || "",
+      allergies: allergies || "",
+      address: address || ""
+    });
+    await newUser.save();
+    // Update local array
+    const userObj = newUser.toObject();
+    users.push(userObj);
+    fs.writeFileSync("./users.json", JSON.stringify(users, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Signup Error:", err);
+    res.status(500).json({ success: false, message: "Error during signup" });
+  }
+});
+
+// HTML Page Routes for Cleaner URLs
+app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "public", "login.html")));
+app.get("/signup", (req, res) => res.sendFile(path.join(__dirname, "public", "signup.html")));
+
+app.use(express.static("public"));
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -590,22 +661,19 @@ ${pendingContext}
 
 EXTRACTION RULES:
 - Identify medicines, quantities (qty), and daily doses (dailyDose).
-- If the user is replying with bare numbers, map them to the medicines currently being discussed.
-- If ${extractedNames.length} > 0, the medicines in question are: ${extractedNames.join(", ")}. MUST OUTPUT THESE.
+- BARE NUMBER RULE: If the user provides only a number (e.g. "1", "5", "10") and ${pendingContext.length > 0 ? "we are currently asking for data for: " + extractedNames.join(", ") : "we are in an order flow"}, you MUST assume that number belongs to the medicines in question: ${extractedNames.join(", ")}.
+- DYNAMIC STATE RECOVERY: If the user is replying with bare numbers, you MUST include the EXACT medicine names being discussed in the 'items' array. Do NOT output items without a 'name'.
 
 CHECKS TO PERFORM:
 1. SAFETY: Check for overdose, self-harm, or dangerous requests.
 2. INTENT: Is this an 'order' (buying) or an 'inquiry' (asking price/stock)?
 3. SUBSCRIPTION: Does the user want this to be a recurring monthly order?
-4. PREDICTIVE: Should we suggest a refill for a past medication?
-5. EXTRACTION: Identify medicines, quantities (qty), and daily doses (dailyDose).
-6. DURATION: Extract duration in days if mentioned.
+4. EXTRACTION: Identify medicines, quantities (qty), and daily doses (dailyDose).
 
 RULES:
 - If unsafe, set 'safe' to false and provide 'reason'.
 - Use 'Chat History' to resolve bare numbers.
-- DYNAMIC STATE RECOVERY: If the user is replying with bare numbers (quantities or daily doses) in response to a bot question, you MUST include the EXACT medicine names from the previous turn in the 'items' array. Do NOT output items without a 'name'.
-- Furthermore, if the chat history shows the user previously provided a 'quantity', and now they are providing a 'daily dose' (or vice versa), you MUST output BOTH the old 'qty' and the new 'dailyDose' along with the 'name' in your JSON output. Never output null for a value that was established in a previous chat turn.
+- If the chat history shows the user previously provided a 'quantity', and now they are providing a 'daily dose' (or vice versa), you MUST output BOTH the old 'qty' and the new 'dailyDose' along with the 'name'. Never output null for a value that was established in a previous turn.
 - Output JSON ONLY.
 
 JSON SCHEMA:
@@ -619,7 +687,7 @@ JSON SCHEMA:
   "items": [ { "name": "exact name from inventory", "qty": number | null, "dailyDose": number | null } ]
 }`
         },
-        { role: "user", content: `Chat History:\n${historyString}\n\nUser Message: ${message}` }
+        { role: "user", content: `CURRENT OPEN CONTEXT: ${extractedNames.join(", ")}\nChat History:\n${historyString}\n\nUser Message: ${message}` }
       ],
       response_format: { type: "json_object" },
       temperature: 0
@@ -1056,35 +1124,7 @@ app.post("/update-profile", async (req, res) => {
   }
 });
 
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await UserModel.findOne({ email });
-    if (!user) {
-      return res.json({ success: false, message: "User not found" });
-    }
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.json({ success: false, message: "Wrong password" });
-    }
-    res.json({
-      success: true,
-      user: {
-        role: user.role,
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        height: user.height,
-        weight: user.weight,
-        dob: user.dob,
-        allergies: user.allergies,
-        address: user.address
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Login error" });
-  }
-});
+
 
 
 

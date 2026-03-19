@@ -1,6 +1,7 @@
 [
   {
-    "id": 1772340181947,
+    "_id": "69af2c5e84245d1055cf730a",
+    "id": "1772340181947",
     "name": "Test User",
     "email": "test@example.com",
     "password": "$2b$10$zwYJUV5HosavredQULzzJumvycKCT6FHebzB2mWzMu3XBMfszIksC",
@@ -8,11 +9,14 @@
     "dob": "",
     "height": "180",
     "weight": "75",
-    "allergies": "Peanuts",
-    "address": "123 Test St, Test City"
+    "allergies": "Penicillin",
+    "address": "123 Test St, Test City",
+    "language": "en",
+    "__v": 0
   },
   {
-    "id": 1772340444900,
+    "_id": "69af2c5e84245d1055cf730b",
+    "id": "1772340444900",
     "name": "Admin User",
     "email": "admin@example.com",
     "password": "$2b$10$QzIx6NDtHLHOoDUod2GMj.hv4aAwifP8enS4VAxWSMO/kVGIt8VTG",
@@ -21,6 +25,23 @@
     "height": "",
     "weight": "",
     "allergies": "",
-    "address": ""
+    "address": "",
+    "language": "en",
+    "__v": 0
+  },
+  {
+    "_id": "69af6ad96ac1e58f70f04200",
+    "id": "1773103833982",
+    "name": "Test User",
+    "email": "testuser_jetski@example.com",
+    "password": "$2b$10$KO7eRCm1mVzUr8oz.L1PiurpMG1sjHOLxkicEMygB7QBD3BQc5L4G",
+    "role": "user",
+    "dob": "",
+    "height": "",
+    "weight": "",
+    "allergies": "",
+    "address": "",
+    "language": "en",
+    "__v": 0
   }
 ]
